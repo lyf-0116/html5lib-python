@@ -171,9 +171,10 @@ class TreeWalker(base.NonRecursiveTreeWalker):
                 value = ensure_str(value)
                 match = tag_regexp.match(name)
                 if match:
-                    attrs[(match.group(1), match.group(2))] = value
+                    attrs[(match.group(1),
+                           self.filter.fromXmlName(match.group(2)))] = value
                 else:
-                    attrs[(None, name)] = value
+                    attrs[(None, self.filter.fromXmlName(name))] = value
             return (base.ELEMENT, namespace, self.filter.fromXmlName(tag),
                     attrs, len(node) > 0 or node.text)
 

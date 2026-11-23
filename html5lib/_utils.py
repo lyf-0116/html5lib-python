@@ -9,6 +9,8 @@ except ImportError:
 
 from six import text_type, PY3
 
+from .constants import prefixes, unadjustForeignAttributes
+
 if PY3:
     import xml.etree.ElementTree as default_etree
 else:
@@ -20,7 +22,7 @@ else:
 
 __all__ = ["default_etree", "MethodDispatcher", "isSurrogatePair",
            "surrogatePairToCodepoint", "moduleFactoryFactory",
-           "supports_lone_surrogates"]
+           "supports_lone_surrogates", "getAttributeName"]
 
 
 # Platforms not supporting lone surrogates (\uD800-\uDFFF) should be
@@ -145,3 +147,18 @@ def moduleFactoryFactory(factory):
             return mod
 
     return moduleFactory
+
+
+def getAttributeName(namespace, name):
+    """Return the serialized name for an attribute's structured identity."""
+    if namespace is None:
+        return name
+
+    attribute_name = unadjustForeignAttributes.get((namespace, name))
+    if attribute_name is not None:
+        return attribute_name
+
+    prefix = prefixes.get(namespace)
+    if prefix is None:
+        return name
+    return "%s:%s" % (prefix, name)

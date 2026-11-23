@@ -15,7 +15,8 @@ from xml.sax.saxutils import escape, unescape
 from six.moves import urllib_parse as urlparse
 
 from . import base
-from ..constants import namespaces, prefixes
+from .._utils import getAttributeName
+from ..constants import namespaces
 
 __all__ = ["Filter"]
 
@@ -556,21 +557,21 @@ svg_attr_val_allows_ref = frozenset((
 ))
 
 svg_allow_local_href = frozenset((
-    (None, 'altGlyph'),
-    (None, 'animate'),
-    (None, 'animateColor'),
-    (None, 'animateMotion'),
-    (None, 'animateTransform'),
-    (None, 'cursor'),
-    (None, 'feImage'),
-    (None, 'filter'),
-    (None, 'linearGradient'),
-    (None, 'pattern'),
-    (None, 'radialGradient'),
-    (None, 'textpath'),
-    (None, 'tref'),
-    (None, 'set'),
-    (None, 'use')
+    (namespaces['svg'], 'altGlyph'),
+    (namespaces['svg'], 'animate'),
+    (namespaces['svg'], 'animateColor'),
+    (namespaces['svg'], 'animateMotion'),
+    (namespaces['svg'], 'animateTransform'),
+    (namespaces['svg'], 'cursor'),
+    (namespaces['svg'], 'feImage'),
+    (namespaces['svg'], 'filter'),
+    (namespaces['svg'], 'linearGradient'),
+    (namespaces['svg'], 'pattern'),
+    (namespaces['svg'], 'radialGradient'),
+    (namespaces['svg'], 'textPath'),
+    (namespaces['svg'], 'tref'),
+    (namespaces['svg'], 'set'),
+    (namespaces['svg'], 'use')
 ))
 
 allowed_css_properties = frozenset((
@@ -787,7 +788,10 @@ class Filter(base.Filter):
         self.allowed_content_types = allowed_content_types
         self.attr_val_is_uri = attr_val_is_uri
         self.svg_attr_val_allows_ref = svg_attr_val_allows_ref
-        self.svg_allow_local_href = svg_allow_local_href
+        self.svg_allow_local_href = frozenset(
+            (namespaces['svg'], name) if namespace is None else (namespace, name)
+            for namespace, name in svg_allow_local_href
+        )
 
     def __iter__(self):
         for token in base.Filter.__iter__(self):
@@ -865,10 +869,10 @@ class Filter(base.Filter):
                     attrs[attr] = re.sub(r'url\s*\(\s*[^#\s][^)]+?\)',
                                          ' ',
                                          unescape(attrs[attr]))
-            if (token["name"] in self.svg_allow_local_href and
-                (namespaces['xlink'], 'href') in attrs and re.search(r'^\s*[^#\s].*',
-                                                                     attrs[(namespaces['xlink'], 'href')])):
-                del attrs[(namespaces['xlink'], 'href')]
+            if (token["namespace"], token["name"]) in self.svg_allow_local_href:
+                for href in ((None, 'href'), (namespaces['xlink'], 'href')):
+                    if href in attrs and re.search(r'^\s*[^#\s].*', attrs[href]):
+                        del attrs[href]
             if (None, 'style') in attrs:
                 attrs[(None, 'style')] = self.sanitize_css(attrs[(None, 'style')])
             token["data"] = attrs
@@ -882,7 +886,7 @@ class Filter(base.Filter):
             assert token_type in ("StartTag", "EmptyTag")
             attrs = []
             for (ns, name), v in token["data"].items():
-                attrs.append(' %s="%s"' % (name if ns is None else "%s:%s" % (prefixes[ns], name), escape(v)))
+                attrs.append(' %s="%s"' % (getAttributeName(ns, name), escape(v)))
             token["data"] = "<%s%s>" % (token["name"], ''.join(attrs))
         else:
             token["data"] = "<%s>" % token["name"]

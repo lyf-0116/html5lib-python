@@ -172,3 +172,27 @@ def test_ol_reversed_allowed():
     sanitized = sanitize_html("<ol reversed><li>.</ol>")
     expected = '<ol reversed><li>.</li></ol>'
     assert expected == sanitized
+
+
+@pytest.mark.parametrize("attribute", ["href", "xlink:href"])
+def test_svg_external_reference_is_removed(attribute):
+    sanitized = sanitize_html(
+        '<svg><use %s="https://example.com/icon.svg"></use></svg>' % attribute)
+    expected = '<svg><use></use></svg>'
+    assert expected == sanitized
+
+
+@pytest.mark.parametrize("attribute", ["href", "xlink:href"])
+def test_svg_local_reference_is_allowed(attribute):
+    sanitized = sanitize_html(
+        '<svg><use %s="#icon"></use></svg>' % attribute)
+    expected = '<svg><use %s="#icon"></use></svg>' % attribute
+    assert expected == sanitized
+
+
+def test_svg_attribute_identity_is_idempotent():
+    sanitized = sanitize_html(
+        '<svg><use href="#first" xlink:href="#second"></use></svg>')
+    expected = '<svg><use href="#first" xlink:href="#second"></use></svg>'
+    assert expected == sanitized
+    assert expected == sanitize_html(sanitized)

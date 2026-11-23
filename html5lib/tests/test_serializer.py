@@ -130,6 +130,42 @@ def testAttributeValue():
                     ["<span potato=&amacr;>"], {"encoding": "iso-8859-1"})
 
 
+def testForeignAttributeNamespaceIsSerialized():
+    test_serializer(
+        [["StartTag", "http://www.w3.org/2000/svg", "use",
+          [{"namespace": "http://www.w3.org/1999/xlink",
+            "name": "href", "value": "#target"},
+           {"namespace": "http://www.w3.org/XML/1998/namespace",
+            "name": "lang", "value": "en"}]]],
+        ['<use xlink:href=#target xml:lang=en>'],
+        {"omit_optional_tags": False})
+
+
+def testDefaultNamespaceAttributeIsSerialized():
+    test_serializer(
+        [["StartTag", "http://www.w3.org/2000/svg", "svg",
+          [{"namespace": "http://www.w3.org/2000/xmlns/",
+            "name": "xmlns", "value": "http://www.w3.org/2000/svg"}]]],
+        ['<svg xmlns="http://www.w3.org/2000/svg">'],
+        {"omit_optional_tags": False})
+
+
+@pytest.mark.parametrize("treebuilder,treewalker", [
+    ("etree", "etree"),
+    pytest.param("lxml", "lxml",
+                 marks=pytest.mark.skipif(
+                     "lxml" not in optionals_loaded, reason="lxml not importable")),
+])
+def testForeignAttributeRoundTrip(treebuilder, treewalker):
+    from html5lib import parseFragment
+
+    parsed = parseFragment(
+        '<svg><use xlink:href="#target" xml:lang="en"></use></svg>',
+        treebuilder=treebuilder)
+    assert serialize(parsed, tree=treewalker, omit_optional_tags=False) == (
+        '<svg><use xlink:href=#target xml:lang=en></use></svg>')
+
+
 def testEndTagName():
     throwsWithLatin1([["EndTag", "http://www.w3.org/1999/xhtml", "\u0101"]])
 
