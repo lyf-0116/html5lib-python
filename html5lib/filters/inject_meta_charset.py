@@ -1,6 +1,13 @@
 from __future__ import absolute_import, division, unicode_literals
 
+from ..constants import namespaces
+
 from . import base
+
+# Key marking tokens synthesized by this filter, so that downstream
+# filters (e.g. the sanitizer) can distinguish them from untrusted
+# tokens coming from the source document.
+injected_token_key = "_html5lib_injected"
 
 
 class Filter(base.Filter):
@@ -48,10 +55,16 @@ class Filter(base.Filter):
                 elif token["name"].lower() == "head" and not meta_found:
                     # insert meta into empty head
                     yield {"type": "StartTag", "name": "head",
-                           "data": token["data"]}
+                           "namespace": namespaces["html"],
+                           "data": token["data"],
+                           injected_token_key: True}
                     yield {"type": "EmptyTag", "name": "meta",
-                           "data": {(None, "charset"): self.encoding}}
-                    yield {"type": "EndTag", "name": "head"}
+                           "namespace": namespaces["html"],
+                           "data": {(None, "charset"): self.encoding},
+                           injected_token_key: True}
+                    yield {"type": "EndTag", "name": "head",
+                           "namespace": namespaces["html"],
+                           injected_token_key: True}
                     meta_found = True
                     continue
 
@@ -61,7 +74,9 @@ class Filter(base.Filter):
                     yield pending.pop(0)
                     if not meta_found:
                         yield {"type": "EmptyTag", "name": "meta",
-                               "data": {(None, "charset"): self.encoding}}
+                               "namespace": namespaces["html"],
+                               "data": {(None, "charset"): self.encoding},
+                               injected_token_key: True}
                     while pending:
                         yield pending.pop(0)
                     meta_found = True

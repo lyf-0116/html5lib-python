@@ -15,6 +15,7 @@ from xml.sax.saxutils import escape, unescape
 from six.moves import urllib_parse as urlparse
 
 from . import base
+from .inject_meta_charset import injected_token_key
 from ..constants import namespaces, prefixes
 
 __all__ = ["Filter"]
@@ -817,12 +818,27 @@ class Filter(base.Filter):
                 (namespace is None and
                  (namespaces["html"], name) in self.allowed_elements)):
                 return self.allowed_token(token)
+            elif self.injected_token_allowed(token):
+                return self.allowed_token(token)
             else:
                 return self.disallowed_token(token)
         elif token_type == "Comment":
             pass
         else:
             return token
+
+    def injected_token_allowed(self, token):
+        # Tokens synthesized by the inject_meta_charset filter are trusted
+        # by origin, but only in the exact shapes that filter can emit, so
+        # that vectors previously closed by disallowing meta altogether
+        # (refresh redirects, content-type rewriting) stay closed.
+        if not token.get(injected_token_key):
+            return False
+        if token["name"] == "head" and token["type"] in ("StartTag", "EndTag"):
+            return True
+        return (token["type"] == "EmptyTag" and
+                token["name"] == "meta" and
+                set(token.get("data", {})) == {(None, "charset")})
 
     def allowed_token(self, token):
         if "data" in token:
