@@ -8,6 +8,7 @@ from ..treebuilders.etree import tag_regexp
 
 from . import base
 
+from ..constants import prefixes
 from .. import _ihatexml
 
 
@@ -160,7 +161,7 @@ class TreeWalker(base.NonRecursiveTreeWalker):
         else:
             # This is assumed to be an ordinary element
             match = tag_regexp.match(ensure_str(node.tag))
-            if match:
+            if match and match.group(1) in prefixes:
                 namespace, tag = match.groups()
             else:
                 namespace = None
@@ -170,7 +171,7 @@ class TreeWalker(base.NonRecursiveTreeWalker):
                 name = ensure_str(name)
                 value = ensure_str(value)
                 match = tag_regexp.match(name)
-                if match:
+                if match and match.group(1) in prefixes:
                     attrs[(match.group(1), match.group(2))] = value
                 else:
                     attrs[(None, name)] = value

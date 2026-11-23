@@ -6,6 +6,7 @@ import re
 from six import string_types
 
 from . import base
+from ..constants import prefixes
 from .._utils import moduleFactoryFactory
 
 tag_regexp = re.compile("{([^}]*)}(.*)")
@@ -54,7 +55,7 @@ def getETreeBuilder(ElementTreeImplementation):
                 assert isinstance(node.tag, string_types), type(node.tag)
                 # This is assumed to be an ordinary element
                 match = tag_regexp.match(node.tag)
-                if match:
+                if match and match.group(1) in prefixes:
                     namespace, tag = match.groups()
                 else:
                     namespace = None
@@ -62,7 +63,7 @@ def getETreeBuilder(ElementTreeImplementation):
                 attrs = OrderedDict()
                 for name, value in list(node.attrib.items()):
                     match = tag_regexp.match(name)
-                    if match:
+                    if match and match.group(1) in prefixes:
                         attrs[(match.group(1), match.group(2))] = value
                     else:
                         attrs[(None, name)] = value

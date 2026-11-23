@@ -103,7 +103,7 @@ def testSerializer(element):
         else:
             assert isinstance(element, etree._Element)
             nsmatch = etree_builders.tag_regexp.match(element.tag)
-            if nsmatch is not None:
+            if nsmatch is not None and nsmatch.group(1) in constants.prefixes:
                 ns = nsmatch.group(1)
                 tag = nsmatch.group(2)
                 prefix = constants.prefixes[ns]
@@ -117,7 +117,7 @@ def testSerializer(element):
                 attributes = []
                 for name, value in element.attrib.items():
                     nsmatch = tag_regexp.match(name)
-                    if nsmatch is not None:
+                    if nsmatch is not None and nsmatch.group(1) in constants.prefixes:
                         ns, name = nsmatch.groups()
                         name = infosetFilter.fromXmlName(name)
                         prefix = constants.prefixes[ns]

@@ -429,5 +429,17 @@
    "name": "attributes_with_embedded_quotes_II",
    "input": "<img src=notthere.jpg\"\"onerror=\"alert(2) />",
    "output": "<img src='notthere.jpg\"\"onerror=\"alert(2)'/>"
+  },
+
+  {
+   "name": "attribute_name_with_fake_namespace",
+   "input": "<script {foo}bar=\"baz\">alert(1)</script>",
+   "output": "&lt;script U0007BfooU0007Dbar=\"baz\"&gt;alert(1)&lt;/script&gt;"
+  },
+
+  {
+   "name": "attribute_name_spoofing_namespace_on_allowed_element",
+   "input": "<p {foo}href=\"javascript:alert(1)\">x</p>",
+   "output": "<p>x</p>"
   }
 ]

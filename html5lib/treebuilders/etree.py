@@ -16,6 +16,18 @@ from .._utils import moduleFactoryFactory
 tag_regexp = re.compile("{([^}]*)}(.*)")
 
 
+def _escapeAttributeName(name):
+    # ElementTree uses "{namespace}local" Clark notation for attribute names.
+    # The tokenizer lets literal "{" and "}" through in unadjusted attribute
+    # names, so escape them (using the same encoding as InfosetFilter) to stop
+    # a crafted name from being mistaken for a namespaced attribute.
+    return name.replace("{", "U0007B").replace("}", "U0007D")
+
+
+def _unescapeAttributeName(name):
+    return name.replace("U0007B", "{").replace("U0007D", "}")
+
+
 def getETreeBuilder(ElementTreeImplementation, fullTree=False):
     ElementTree = ElementTreeImplementation
     ElementTreeCommentType = ElementTree.Comment("asd").tag
@@ -72,7 +84,7 @@ def getETreeBuilder(ElementTreeImplementation, fullTree=False):
                     if isinstance(key, tuple):
                         name = "{%s}%s" % (key[2], key[1])
                     else:
-                        name = key
+                        name = _escapeAttributeName(key)
                     el_attrib[name] = value
 
         attributes = property(_getAttributes, _setAttributes)
@@ -228,6 +240,8 @@ def getETreeBuilder(ElementTreeImplementation, fullTree=False):
 
                 if nsmatch is None:
                     name = element.tag
+                elif nsmatch.group(1) not in constants.prefixes:
+                    name = element.tag
                 else:
                     ns, name = nsmatch.groups()
                     prefix = constants.prefixes[ns]
@@ -238,12 +252,12 @@ def getETreeBuilder(ElementTreeImplementation, fullTree=False):
                     attributes = []
                     for name, value in element.attrib.items():
                         nsmatch = tag_regexp.match(name)
-                        if nsmatch is not None:
+                        if nsmatch is not None and nsmatch.group(1) in constants.prefixes:
                             ns, name = nsmatch.groups()
                             prefix = constants.prefixes[ns]
                             attr_string = "%s %s" % (prefix, name)
                         else:
-                            attr_string = name
+                            attr_string = _unescapeAttributeName(name)
                         attributes.append((attr_string, value))
 
                     for name, value in sorted(attributes):

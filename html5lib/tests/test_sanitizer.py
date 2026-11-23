@@ -172,3 +172,71 @@ def test_ol_reversed_allowed():
     sanitized = sanitize_html("<ol reversed><li>.</ol>")
     expected = '<ol reversed><li>.</li></ol>'
     assert expected == sanitized
+
+
+@pytest.mark.parametrize("treebuilder,treewalker", [
+    ("etree", "etree"),
+    ("lxml", "lxml"),
+])
+def test_braced_attribute_unknown_namespace_no_crash(treebuilder, treewalker):
+    # A name shaped like Clark notation with a namespace the tokenizer never
+    # assigns must not crash the sanitizer (prefixes[ns] KeyError) and must
+    # not be treated as a namespaced, whitelisted attribute.
+    parsed = parseFragment('<script {foo}bar="baz">alert(1)</script>',
+                           treebuilder=treebuilder)
+    with pytest.deprecated_call():
+        serialized = serialize(parsed,
+                               sanitize=True,
+                               tree=treewalker,
+                               omit_optional_tags=False,
+                               quote_attr_values="always",
+                               quote_char='"')
+    assert "<script" not in serialized
+
+
+@pytest.mark.parametrize("treebuilder,treewalker", [
+    ("etree", "etree"),
+    ("lxml", "lxml"),
+])
+def test_braced_attribute_cannot_spoof_namespace(treebuilder, treewalker):
+    # The braces survive the tokenizer but must never resolve to one of the
+    # known namespaces, so the attribute is stripped rather than accepted.
+    parsed = parseFragment('<p {foo}href="javascript:alert(1)">x</p>',
+                           treebuilder=treebuilder)
+    with pytest.deprecated_call():
+        serialized = serialize(parsed,
+                               sanitize=True,
+                               tree=treewalker,
+                               omit_optional_tags=False,
+                               quote_attr_values="always",
+                               quote_char='"')
+    assert serialized == "<p>x</p>"
+
+
+@pytest.mark.parametrize("treebuilder,treewalker", [
+    ("etree", "etree"),
+    ("lxml", "lxml"),
+])
+def test_unclosed_brace_attribute_no_crash(treebuilder, treewalker):
+    parsed = parseFragment('<script {foobar="baz">alert(1)</script>',
+                           treebuilder=treebuilder)
+    with pytest.deprecated_call():
+        serialized = serialize(parsed,
+                               sanitize=True,
+                               tree=treewalker,
+                               omit_optional_tags=False,
+                               quote_attr_values="always",
+                               quote_char='"')
+    assert "<script" not in serialized
+
+
+def test_legitimate_foreign_attribute_identity_preserved():
+    parsed = parseFragment(
+        '<svg><a xlink:href="#ok" xlink:role="r">x</a></svg>')
+    from html5lib import getTreeWalker
+    attrs = {}
+    for token in getTreeWalker("etree")(parsed):
+        if token.get("type") == "StartTag":
+            attrs.update(token["data"])
+    assert (constants.namespaces["xlink"], "href") in attrs
+    assert (constants.namespaces["xlink"], "role") in attrs

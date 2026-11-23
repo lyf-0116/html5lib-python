@@ -882,7 +882,16 @@ class Filter(base.Filter):
             assert token_type in ("StartTag", "EmptyTag")
             attrs = []
             for (ns, name), v in token["data"].items():
-                attrs.append(' %s="%s"' % (name if ns is None else "%s:%s" % (prefixes[ns], name), escape(v)))
+                # Only the handful of namespaces in ``prefixes`` can ever be
+                # produced by the tokenizer's foreign-attribute adjustment.
+                # Anything else is an unadjusted name that a treewalker had
+                # to guess from a string; render the local name rather than
+                # crashing on a missing prefix.
+                if ns is not None and ns in prefixes:
+                    rendered_name = "%s:%s" % (prefixes[ns], name)
+                else:
+                    rendered_name = name
+                attrs.append(' %s="%s"' % (rendered_name, escape(v)))
             token["data"] = "<%s%s>" % (token["name"], ''.join(attrs))
         else:
             token["data"] = "<%s>" % token["name"]
