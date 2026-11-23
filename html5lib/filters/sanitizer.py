@@ -837,28 +837,17 @@ class Filter(base.Filter):
             # Remove attributes with disallowed URL values
             for attr in (attr_names & self.attr_val_is_uri):
                 assert attr in attrs
-                # I don't have a clue where this regexp comes from or why it matches those
-                # characters, nor why we call unescape. I just know it's always been here.
-                # Should you be worried by this comment in a sanitizer? Yes. On the other hand, all
-                # this will do is remove *more* than it otherwise would.
-                val_unescaped = re.sub("[`\x00-\x20\x7f-\xa0\\s]+", '',
-                                       unescape(attrs[attr])).lower()
-                # remove replacement characters from unescaped characters
-                val_unescaped = val_unescaped.replace("\ufffd", "")
-                try:
-                    uri = urlparse.urlparse(val_unescaped)
-                except ValueError:
-                    uri = None
+                if not self._is_safe_uri(attrs[attr]):
                     del attrs[attr]
-                if uri and uri.scheme:
-                    if uri.scheme not in self.allowed_protocols:
-                        del attrs[attr]
-                    if uri.scheme == 'data':
-                        m = data_content_type.match(uri.path)
-                        if not m:
-                            del attrs[attr]
-                        elif m.group('content_type') not in self.allowed_content_types:
-                            del attrs[attr]
+
+            # SVG animation elements (animate, set, ...) can change the
+            # value of the attribute named by attributeName when the
+            # document is rendered, i.e. after sanitization. If the
+            # targeted attribute is URI-valued, apply the same protocol
+            # checks to the animation values so the element cannot
+            # rewrite e.g. href to a javascript: URL at render time.
+            if (None, 'attributeName') in attrs:
+                self.sanitize_animation_attrs(attrs)
 
             for attr in self.svg_attr_val_allows_ref:
                 if attr in attrs:
@@ -873,6 +862,52 @@ class Filter(base.Filter):
                 attrs[(None, 'style')] = self.sanitize_css(attrs[(None, 'style')])
             token["data"] = attrs
         return token
+
+    def _is_safe_uri(self, value):
+        # I don't have a clue where this regexp comes from or why it matches those
+        # characters, nor why we call unescape. I just know it's always been here.
+        # Should you be worried by this comment in a sanitizer? Yes. On the other hand, all
+        # this will do is remove *more* than it otherwise would.
+        val_unescaped = re.sub("[`\x00-\x20\x7f-\xa0\\s]+", '',
+                               unescape(value)).lower()
+        # remove replacement characters from unescaped characters
+        val_unescaped = val_unescaped.replace("\ufffd", "")
+        try:
+            uri = urlparse.urlparse(val_unescaped)
+        except ValueError:
+            return False
+        if uri.scheme:
+            if uri.scheme not in self.allowed_protocols:
+                return False
+            if uri.scheme == 'data':
+                m = data_content_type.match(uri.path)
+                if not m:
+                    return False
+                elif m.group('content_type') not in self.allowed_content_types:
+                    return False
+        return True
+
+    def sanitize_animation_attrs(self, attrs):
+        attribute_name = attrs[(None, 'attributeName')]
+        # The prefix is dropped when the document is serialized, so
+        # "xlink:href" and "href" end up naming the same attribute;
+        # normalize to the local name before looking it up.
+        local_name = attribute_name.strip().lower().split(':')[-1]
+        if ((None, local_name) not in self.attr_val_is_uri and
+                (namespaces['xlink'], local_name) not in self.attr_val_is_uri):
+            return
+        for name in ('from', 'to', 'by'):
+            attr = (None, name)
+            if attr in attrs and not self._is_safe_uri(attrs[attr]):
+                del attrs[attr]
+        values_attr = (None, 'values')
+        if values_attr in attrs:
+            # values is a semicolon-separated list; every item has to be
+            # safe, otherwise the whole list is dropped
+            for value in attrs[values_attr].split(';'):
+                if not self._is_safe_uri(value):
+                    del attrs[values_attr]
+                    break
 
     def disallowed_token(self, token):
         token_type = token["type"]

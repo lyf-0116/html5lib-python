@@ -172,3 +172,45 @@ def test_ol_reversed_allowed():
     sanitized = sanitize_html("<ol reversed><li>.</ol>")
     expected = '<ol reversed><li>.</li></ol>'
     assert expected == sanitized
+
+
+def test_svg_animation_values_protocol():
+    sanitized = sanitize_html('<svg><a><animate attributeName="href" values="javascript:alert(1)"/></a></svg>')
+    expected = '<svg><a><animate attributeName="href"></animate></a></svg>'
+    assert expected == sanitized
+
+
+def test_svg_animation_set_to_protocol():
+    sanitized = sanitize_html('<svg><a><set attributeName="href" to="javascript:alert(1)"/></a></svg>')
+    expected = '<svg><a><set attributeName="href"></set></a></svg>'
+    assert expected == sanitized
+
+
+def test_svg_animation_xlink_href_prefixed_attributeName():
+    sanitized = sanitize_html('<svg><a><animate attributeName="xlink:href" values="javascript:alert(1)"/></a></svg>')
+    expected = '<svg><a><animate attributeName="xlink:href"></animate></a></svg>'
+    assert expected == sanitized
+
+
+def test_svg_animation_from_protocol():
+    sanitized = sanitize_html('<svg><a><animate attributeName="href" from="javascript:alert(1)" to="http://example.com/"/></a></svg>')
+    expected = '<svg><a><animate attributeName="href" to="http://example.com/"></animate></a></svg>'
+    assert expected == sanitized
+
+
+def test_svg_animation_values_list_with_bad_item():
+    sanitized = sanitize_html('<svg><a><animate attributeName="href" values="http://safe.example/;javascript:alert(1)"/></a></svg>')
+    expected = '<svg><a><animate attributeName="href"></animate></a></svg>'
+    assert expected == sanitized
+
+
+def test_svg_animation_safe_uri_values_allowed():
+    sanitized = sanitize_html('<svg><a><animate attributeName="href" values="https://a.example/;https://b.example/"/></a></svg>')
+    expected = '<svg><a><animate attributeName="href" values="https://a.example/;https://b.example/"></animate></a></svg>'
+    assert expected == sanitized
+
+
+def test_svg_animation_non_uri_attributeName_untouched():
+    sanitized = sanitize_html('<svg><rect><animate attributeName="x" values="10;20;10" dur="2s"/></rect></svg>')
+    expected = '<svg><rect><animate attributeName="x" dur="2s" values="10;20;10"></animate></rect></svg>'
+    assert expected == sanitized
